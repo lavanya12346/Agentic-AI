@@ -1,95 +1,74 @@
 """
 Day 2 - AI Student Study Planner
-Uses the OpenAI API directly (without LangChain).
+Uses the Groq Python SDK directly (without LangChain).
 
-Setup:
-    pip install openai
-
-Set your API key before running:
-    Windows PowerShell:  $env:OPENAI_API_KEY="your_api_key"
-    macOS/Linux:         export OPENAI_API_KEY="your_api_key"
-
+Install: pip install groq
+Set GROQ_API_KEY as an environment variable before running.
 Never paste your API key into this file or upload it to GitHub.
 """
-
 import os
-from datetime import date
-from openai import OpenAI
+from groq import Groq
 
 
 def get_student_details():
     print("\n===== AI STUDENT STUDY PLANNER =====\n")
-
     name = input("Enter your name: ").strip()
     subjects = input("Enter your subjects (comma-separated): ").strip()
-    difficult_topics = input(
-        "Enter topics you find difficult (comma-separated): "
-    ).strip()
-    exam_date = input("Enter your exam date (YYYY-MM-DD): ").strip()
+    difficult_topics = input("Enter topics you find difficult (comma-separated): ").strip()
+    exam_date = input("Enter your exam date (for example, 15 December 2026): ").strip()
     study_hours = input("How many hours can you study per day? ").strip()
-
     return name, subjects, difficult_topics, exam_date, study_hours
 
 
 def generate_study_plan(name, subjects, difficult_topics, exam_date, study_hours):
-    # The OpenAI client reads OPENAI_API_KEY from the environment.
-    client = OpenAI()
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        raise ValueError("GROQ_API_KEY was not found. Add it to your environment or Colab Secrets.")
 
+    client = Groq(api_key=api_key)
     prompt = f"""
-You are an encouraging and practical AI study-planning assistant.
-
-Create a realistic study plan using the student's details below.
-
+Create a realistic exam preparation plan using these details:
 Student name: {name}
 Subjects: {subjects}
 Difficult topics: {difficult_topics}
 Exam date: {exam_date}
 Available study time per day: {study_hours} hours
-Today's date: {date.today()}
 
-Your response must include:
-1. A short overview of the preparation strategy.
-2. A day-wise timetable until the exam date.
-3. Extra attention to the difficult topics.
+Include:
+1. A short preparation strategy.
+2. A day-wise study timetable leading up to the exam.
+3. Extra practice time for difficult topics.
 4. Short breaks and revision sessions.
 5. A final revision checklist.
 
-Keep the plan achievable. If the exam date is invalid or has already passed,
-politely point that out and ask the student to correct it. Do not invent
-the student's syllabus or claim to know the exam question paper.
+Keep the plan realistic. If details are unclear, mention the uncertainty.
+Do not invent the student's syllabus or claim to know the exam question paper.
 """
-
-    response = client.responses.create(
-        model="gpt-4.1-mini",
-        input=prompt
+    response = client.chat.completions.create(
+        model="openai/gpt-oss-120b",
+        messages=[
+            {"role": "system", "content": "You create clear, realistic and encouraging study plans."},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.4
     )
-
-    return response.output_text
+    return response.choices[0].message.content
 
 
 def main():
     try:
-        if not os.getenv("OPENAI_API_KEY"):
-            print("ERROR: OPENAI_API_KEY was not found.")
-            print("Set your OpenAI API key as an environment variable and try again.")
-            return
-
         details = get_student_details()
         plan = generate_study_plan(*details)
-
         print("\n===== YOUR PERSONALIZED STUDY PLAN =====\n")
         print(plan)
-
         with open("study_plan.txt", "w", encoding="utf-8") as file:
             file.write(plan)
-
-        print("\nYour study plan was also saved to study_plan.txt.")
-
-    except ValueError:
-        print("Please enter valid details and try again.")
+        print("\nYour study plan was saved to study_plan.txt.")
+    except ValueError as error:
+        print(f"Configuration error: {error}")
     except Exception as error:
         print(f"Something went wrong: {error}")
-        print("Check your API key, internet connection, and OpenAI API access.")
+        print("Check your Groq API key, internet connection, and model access.")
 
 
 if __name__ == "__main__":
